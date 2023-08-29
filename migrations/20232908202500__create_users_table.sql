@@ -1,0 +1,8 @@
+CREATE TABLE users (
+    user_id VARCHAR(80) PRIMARY KEY,
+    username VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(80) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
