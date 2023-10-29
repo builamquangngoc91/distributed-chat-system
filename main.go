@@ -23,7 +23,7 @@ func main() {
 		panic(fmt.Sprintf("create logger error: %s", err.Error()))
 	}
 
-	dsn := "host=localhost user=postgres password=postgres dbname=user-service port=5432 sslmode=disable"
+	dsn := "host=localhost user=postgres password=postgres dbname=socialnetwork port=5432 sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		logger.Sugar().Errorf("connect database error: %s", err.Error())
