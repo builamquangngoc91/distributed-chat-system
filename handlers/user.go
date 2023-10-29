@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
 	"tylerbui430/user-service/domains"
 	"tylerbui430/user-service/models"
 	"tylerbui430/user-service/repositories"
@@ -11,34 +13,55 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+const (
+	jwtKey              = "fdsfdsafdsafdsfdadcxa"
+	jwtClaimIDTmpl      = "jwt-claim-id-%s"
+	authorizationHeader = "authorization"
+	bearerType          = "Bearer"
+)
+
+var _ UserHandlers = &userHandlers{}
 
 type UserHandlers interface {
 	RouteGroup(r *gin.Engine)
 
 	CreateUser(c *gin.Context)
-	GetUser(c *gin.Context)
-
+	GetUserProfile(c *gin.Context)
 	GetToken(c *gin.Context)
+	RevokeToken(c *gin.Context)
+}
+
+type UserHandlersDeps struct {
+	DB          *gorm.DB
+	RedisClient *redis.Client
 }
 
 type userHandlers struct {
-	db *gorm.DB
+	db          *gorm.DB
+	redisClient *redis.Client
 }
 
-func NewUserHandlers(db *gorm.DB) UserHandlers {
+func NewUserHandlers(deps *UserHandlersDeps) UserHandlers {
+	if deps == nil {
+		return nil
+	}
+
 	return &userHandlers{
-		db: db,
+		db:          deps.DB,
+		redisClient: deps.RedisClient,
 	}
 }
 
 func (u *userHandlers) RouteGroup(rg *gin.Engine) {
 	rg.POST("/users/create", u.CreateUser)
 	rg.GET("/users/profile", u.GetUserProfile)
-
 	rg.POST("/users/getToken", u.GetToken)
+	rg.DELETE("/users/revokeToken", u.RevokeToken)
 }
 
 func (u *userHandlers) CreateUser(c *gin.Context) {
@@ -51,9 +74,11 @@ func (u *userHandlers) CreateUser(c *gin.Context) {
 	}
 
 	if err := req.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
 		return
 	}
 
@@ -62,16 +87,20 @@ func (u *userHandlers) CreateUser(c *gin.Context) {
 	})
 	switch err {
 	case nil:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "user already exists",
-		})
+		c.JSON(http.StatusBadRequest,
+			domains.ErrorResponse{
+				Message: "user already exists",
+			},
+		)
 		return
 	case gorm.ErrRecordNotFound:
 		passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 14)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": err.Error(),
-			})
+			c.JSON(http.StatusInternalServerError,
+				domains.ErrorResponse{
+					Message: err.Error(),
+				},
+			)
 			return
 		}
 
@@ -81,15 +110,19 @@ func (u *userHandlers) CreateUser(c *gin.Context) {
 			Name:         req.Name,
 			PasswordHash: string(passwordHash),
 		}); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": err.Error(),
-			})
+			c.JSON(http.StatusInternalServerError,
+				domains.ErrorResponse{
+					Message: err.Error(),
+				},
+			)
 			return
 		}
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
 		return
 	}
 
@@ -99,8 +132,63 @@ func (u *userHandlers) CreateUser(c *gin.Context) {
 func (u *userHandlers) GetUserProfile(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	token := strings.TrimLeft("bearer", c.GetHeader("authorization"))
-	
+	var claims domains.Claims
+	tokenStr := strings.TrimPrefix(c.GetHeader(authorizationHeader), fmt.Sprintf("%s ", bearerType))
+	_, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(jwtKey), nil
+	})
+	switch err {
+	case nil:
+		// no-op
+	default:
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		return
+	}
+
+	jwtClaimID := fmt.Sprintf(jwtClaimIDTmpl, claims.ID)
+	_, err = u.redisClient.Get(ctx, jwtClaimID).Result()
+	switch err {
+	case redis.Nil:
+		// no-op
+	case nil:
+		c.JSON(http.StatusUnauthorized,
+			domains.ErrorResponse{
+				Message: "token was revoked",
+			},
+		)
+		return
+	default:
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		return
+	}
+
+	user, err := repositories.GetUser(ctx, u.db, &repositories.GetUserArgs{
+		Username: claims.Username,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		return
+	}
+
+	c.JSON(http.StatusOK,
+		domains.CreateUserResp{
+			UserID:   user.UserID,
+			Username: user.Username,
+			Name:     user.Name,
+		},
+	)
 }
 
 func (u *userHandlers) GetToken(c *gin.Context) {
@@ -108,14 +196,21 @@ func (u *userHandlers) GetToken(c *gin.Context) {
 
 	var req domains.GetTokenReq
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
 		c.Error(err)
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
 		return
 	}
 
@@ -125,46 +220,89 @@ func (u *userHandlers) GetToken(c *gin.Context) {
 	switch err {
 	case nil:
 		if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"message": "username/password is not correct",
-			})
+			c.JSON(http.StatusBadRequest,
+				domains.ErrorResponse{
+					Message: "password is incorrect",
+				},
+			)
 			return
 		}
 
-		expirationTime := time.Now().Add(30 * 24 * 60 * time.Minute)
+		expiration := 30 * 24 * 60 * 60 * time.Second
+		expirationTime := time.Now().Add(expiration)
 		claims := &domains.Claims{
 			Username: user.Username,
 			RegisteredClaims: jwt.RegisteredClaims{
 				ExpiresAt: jwt.NewNumericDate(expirationTime),
+				ID:        uuid.NewString(),
 			},
 		}
 
-		jwtKey := []byte("fdsfdsafdsafdsfdadcxa")
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString(jwtKey)
+		tokenString, err := token.SignedString([]byte(jwtKey))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": err.Error(),
-			})
+			c.JSON(http.StatusInternalServerError,
+				domains.ErrorResponse{
+					Message: err.Error(),
+				},
+			)
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"type":         "bearer",
-			"access_token": tokenString,
-			"expires_at":   expirationTime.Format(time.DateTime),
-		})
+		c.JSON(http.StatusOK,
+			domains.GetTokenResp{
+				Type:        strings.ToLower(bearerType),
+				AccessToken: tokenString,
+				ExpiresAt:   expirationTime.Format(time.DateTime),
+			},
+		)
+		return
 	case gorm.ErrRecordNotFound:
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "username not found",
-		})
+		c.JSON(http.StatusBadRequest,
+			domains.ErrorResponse{
+				Message: "username not found",
+			},
+		)
 		return
 	default:
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		return
+	}
+}
+
+func (u *userHandlers) RevokeToken(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var claims domains.Claims
+	tokenStr := strings.TrimPrefix(c.GetHeader(authorizationHeader), fmt.Sprintf("%s ", bearerType))
+	_, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(jwtKey), nil
+	})
+	switch err {
+	case nil:
+		// no-op
+	default:
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{})
+	jwtClaimID := fmt.Sprintf(jwtClaimIDTmpl, claims.ID)
+	if err := u.redisClient.Set(ctx, jwtClaimID, time.Now(), 0).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }

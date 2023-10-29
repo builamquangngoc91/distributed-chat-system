@@ -8,14 +8,26 @@ import (
 
 type (
 	CreateUserReq struct {
-		Username string
-		Name     string
-		Password string
+		Username string `json:"username"`
+		Name     string `json:"name"`
+		Password string `json:"password"`
+	}
+
+	CreateUserResp struct {
+		UserID   string `json:"user_id,omitempty"`
+		Username string `json:"username,omitempty"`
+		Name     string `json:"name,omitempty"`
 	}
 
 	GetTokenReq struct {
-		Username string
-		Password string
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	GetTokenResp struct {
+		Type        string `json:"type"`
+		AccessToken string `json:"access_token"`
+		ExpiresAt   string `json:"expires_at"`
 	}
 
 	Claims struct {

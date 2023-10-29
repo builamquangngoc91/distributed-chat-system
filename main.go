@@ -10,6 +10,7 @@ import (
 	"tylerbui430/user-service/handlers"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -28,6 +29,9 @@ func main() {
 		logger.Sugar().Errorf("connect database error: %s", err.Error())
 		return
 	}
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
 
 	// gracefull shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -40,7 +44,11 @@ func main() {
 		})
 	})
 
-	userHandlers := handlers.NewUserHandlers(db)
+	userHandlersDeps := &handlers.UserHandlersDeps{
+		DB:          db,
+		RedisClient: redisClient,
+	}
+	userHandlers := handlers.NewUserHandlers(userHandlersDeps)
 	userHandlers.RouteGroup(router)
 
 	srv := &http.Server{
