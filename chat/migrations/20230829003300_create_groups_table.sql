@@ -1,0 +1,7 @@
+CREATE TABLE groups(
+   group_id VARCHAR(80) PRIMARY KEY,
+   `name` VARCHAR(255) NOT NULL,
+   type VARCHAR(80) NOT NULL,
+   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+);
