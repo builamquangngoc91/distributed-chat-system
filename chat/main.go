@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -142,5 +143,5 @@ func main() {
 	setupRoutes()
 	//startConnectionsManagement()
 	sendMessageToUsers()
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", os.Getenv("HOST")), nil))
 }

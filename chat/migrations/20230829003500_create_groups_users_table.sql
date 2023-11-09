@@ -8,4 +8,4 @@ CREATE TABLE groups_users(
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMPTZ NULL,
     UNIQUE(user_id, group_id)
-)
+);

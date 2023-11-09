@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"tylerbui430/user-service/domains"
-	"tylerbui430/user-service/models"
-	"tylerbui430/user-service/repositories"
+	"auth-service/domains"
+	"auth-service/models"
+	"auth-service/repositories"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"

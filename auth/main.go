@@ -7,7 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"tylerbui430/user-service/handlers"
+
+	"auth-service/handlers"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -17,20 +18,30 @@ import (
 )
 
 func main() {
-
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic(fmt.Sprintf("create logger error: %s", err.Error()))
 	}
 
-	dsn := "host=localhost user=postgres password=postgres dbname=socialnetwork port=5432 sslmode=disable"
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_USERNAME"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_PORT"),
+	)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		logger.Sugar().Errorf("connect database error: %s", err.Error())
 		return
 	}
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: fmt.Sprintf(
+			"%s:%s",
+			os.Getenv("RD_HOST"),
+			os.Getenv("RD_PORT"),
+		),
 	})
 
 	// gracefull shutdown
@@ -52,7 +63,7 @@ func main() {
 	userHandlers.RouteGroup(router)
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%s", os.Getenv("PORT")),
 		Handler: router,
 	}
 	go func() {

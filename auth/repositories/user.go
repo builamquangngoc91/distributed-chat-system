@@ -1,8 +1,8 @@
 package repositories
 
 import (
+	"auth-service/models"
 	"context"
-	"tylerbui430/user-service/models"
 
 	"gorm.io/gorm"
 )
