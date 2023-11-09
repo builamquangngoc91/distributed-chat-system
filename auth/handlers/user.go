@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -19,13 +20,15 @@ import (
 )
 
 const (
-	jwtKey              = "fdsfdsafdsafdsfdadcxa"
 	jwtClaimIDTmpl      = "jwt-claim-id-%s"
 	authorizationHeader = "authorization"
 	bearerType          = "Bearer"
 )
 
-var _ UserHandlers = &userHandlers{}
+var (
+	jwtKey              = os.Getenv("JWT_KEY")
+	_      UserHandlers = &userHandlers{}
+)
 
 type UserHandlers interface {
 	RouteGroup(r *gin.Engine)

@@ -49,12 +49,8 @@ func main() {
 	defer stop()
 
 	router := gin.Default()
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "anc",
-		})
-	})
 
+	// TODO: add ping and health
 	userHandlersDeps := &handlers.UserHandlersDeps{
 		DB:          db,
 		RedisClient: redisClient,

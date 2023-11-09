@@ -40,6 +40,7 @@ services:
       DB_NAME: "socialnetwork"
       RD_HOST: "redis"
       RD_PORT: "6379"
+      JWT_KEY: RtaW4iLCJJc3N
       PORT: "8080"
     depends_on:
       - redis
@@ -62,6 +63,7 @@ services:
       RD_HOST: "redis"
       RD_PORT: "6379"
       PORT: "8081"
+      AUTH_URL: "http://auth:8080"
     depends_on:
       - redis
       - db
