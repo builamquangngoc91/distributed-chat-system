@@ -36,6 +36,8 @@ type UserHandlers interface {
 	GetUserProfile(c *gin.Context)
 	GetToken(c *gin.Context)
 	RevokeToken(c *gin.Context)
+
+	ListUsers(c *gin.Context)
 }
 
 type UserHandlersDeps struct {
@@ -64,6 +66,8 @@ func (u *userHandlers) RouteGroup(rg *gin.Engine) {
 	rg.GET("/users/profile", u.GetUserProfile)
 	rg.POST("/users/getToken", u.GetToken)
 	rg.DELETE("/users/revokeToken", u.RevokeToken)
+
+	rg.POST("/users/listUsers", u.ListUsers)
 }
 
 func (u *userHandlers) CreateUser(c *gin.Context) {
@@ -307,4 +311,50 @@ func (u *userHandlers) RevokeToken(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func (u *userHandlers) ListUsers(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req domains.ListUsersReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		c.Error(err)
+		return
+	}
+
+	if err := req.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+		return
+	}
+
+	users, err := repositories.ListUsers(ctx, u.db, &repositories.ListUsersArgs{
+		IDs: req.UserIDs,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError,
+			domains.ErrorResponse{
+				Message: err.Error(),
+			},
+		)
+	}
+
+	resp := domains.ListUsersResp{}
+	for _, user := range users {
+		resp.Users = append(resp.Users, &domains.User{
+			UserID:   user.UserID,
+			Username: user.Name,
+			Name:     user.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, &resp)
 }

@@ -26,3 +26,18 @@ func GetUser(ctx context.Context, db *gorm.DB, args *GetUserArgs) (*models.User,
 
 	return &user, result.Error
 }
+
+type ListUsersArgs struct {
+	IDs []string
+}
+
+func ListUsers(ctx context.Context, db *gorm.DB, args *ListUsersArgs) (users []*models.User, _ error) {
+	query := db.WithContext(ctx).Table("users")
+	if len(args.IDs) != 0 {
+		query.Where("user_id IN ?", args.IDs)
+	}
+
+	result := query.Find(&users)
+
+	return users, result.Error
+}
