@@ -33,15 +33,15 @@ services:
       - "8080:8080"
     restart: always
     environment:
-      DB_PORT: "5432"
-      DB_HOST: "db"
-      DB_USERNAME: "postgres"
-      DB_PASSWORD: "postgres"
-      DB_NAME: "socialnetwork"
-      RD_HOST: "redis"
-      RD_PORT: "6379"
-      JWT_KEY: RtaW4iLCJJc3N
-      PORT: "8080"
+      SN_DB_PORT: "5432"
+      SN_DB_HOST: "db"
+      SN_DB_USERNAME: "postgres"
+      SN_DB_PASSWORD: "postgres"
+      SN_DB_NAME: "socialnetwork"
+      SN_RD_HOST: "redis"
+      SN_RD_PORT: "6379"
+      SN_AUTH_SERVICE_JWT_KEY: RtaW4iLCJJc3N
+      SN_AUTH_SERVICE_PORT: "8080"
     depends_on:
       - redis
       - db
@@ -55,15 +55,15 @@ services:
       - "8081:8081"
     restart: always
     environment:
-      DB_PORT: "5432"
-      DB_HOST: "db"
-      DB_USERNAME: "postgres"
-      DB_PASSWORD: "postgres"
-      DB_NAME: "socialnetwork"
-      RD_HOST: "redis"
-      RD_PORT: "6379"
-      PORT: "8081"
-      AUTH_URL: "http://auth:8080"
+      SN_DB_PORT: "5432"
+      SN_DB_HOST: "db"
+      SN_DB_USERNAME: "postgres"
+      SN_DB_PASSWORD: "postgres"
+      SN_DB_NAME: "socialnetwork"
+      SN_RD_HOST: "redis"
+      SN_RD_PORT: "6379"
+      SN_CHAT_SERVICE_PORT: "8081"
+      SN_AUTH_SERVICE_BASE_URL: "http://auth:8080"
     depends_on:
       - redis
       - db

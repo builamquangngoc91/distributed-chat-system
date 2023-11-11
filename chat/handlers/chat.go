@@ -1,9 +1,12 @@
 package handlers
 
 import (
-	"chat-service/middlewares"
 	"fmt"
 	"net/http"
+
+	contextHelpers "chat-service/domains/helpers/context"
+	"chat-service/middlewares"
+	"chat-service/services/authservice"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -22,7 +25,8 @@ type ChatHandlersDeps struct {
 }
 
 type chatHandlers struct {
-	db *gorm.DB
+	db          *gorm.DB
+	authService authservice.AuthService
 }
 
 func NewChatHandlers(deps *ChatHandlersDeps) ChatHandlers {
@@ -31,15 +35,20 @@ func NewChatHandlers(deps *ChatHandlersDeps) ChatHandlers {
 	}
 
 	return &chatHandlers{
-		db: deps.DB,
+		db:          deps.DB,
+		authService: authservice.NewAuthService(),
 	}
 }
 
 func (u *chatHandlers) RouteGroup(rg *gin.Engine) {
-	rg.POST("/chats/createChatGroup", middlewares.TokenAuthMiddleware(), u.CreateChatGroup)
+	rg.POST("/chats/createChatGroup", middlewares.TokenAuthMiddleware(u.authService), u.CreateChatGroup)
 }
 
 func (u *chatHandlers) CreateChatGroup(c *gin.Context) {
-	fmt.Printf("user_id : %s", c.Request.Context().Value("user_id"))
+	ctx := c.Request.Context()
+	userID := contextHelpers.GetUserIDFromCtx(ctx)
+
+	fmt.Println(userID)
+
 	c.JSON(http.StatusOK, gin.H{})
 }

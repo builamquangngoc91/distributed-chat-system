@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"auth-service/configs"
 	"auth-service/handlers"
 
 	"github.com/gin-gonic/gin"
@@ -23,13 +24,14 @@ func main() {
 		panic(fmt.Sprintf("create logger error: %s", err.Error()))
 	}
 
+	configs.LoadConfig()
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_USERNAME"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
-		os.Getenv("DB_PORT"),
+		configs.Cfg.Database.Host,
+		configs.Cfg.Database.Username,
+		configs.Cfg.Database.Password,
+		configs.Cfg.Database.Name,
+		configs.Cfg.Database.Port,
 	)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -39,8 +41,8 @@ func main() {
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf(
 			"%s:%s",
-			os.Getenv("RD_HOST"),
-			os.Getenv("RD_PORT"),
+			configs.Cfg.Redis.Host,
+			configs.Cfg.Redis.Port,
 		),
 	})
 
@@ -59,7 +61,7 @@ func main() {
 	userHandlers.RouteGroup(router)
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", os.Getenv("PORT")),
+		Addr:    fmt.Sprintf(":%s", configs.Cfg.AuthService.Port),
 		Handler: router,
 	}
 	go func() {

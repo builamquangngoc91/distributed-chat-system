@@ -3,10 +3,10 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
+	"auth-service/configs"
 	"auth-service/domains"
 	"auth-service/models"
 	"auth-service/repositories"
@@ -21,13 +21,12 @@ import (
 
 const (
 	jwtClaimIDTmpl      = "jwt-claim-id-%s"
-	authorizationHeader = "authorization"
+	authorizationHeader = "Authorization"
 	bearerType          = "Bearer"
 )
 
 var (
-	jwtKey              = os.Getenv("JWT_KEY")
-	_      UserHandlers = &userHandlers{}
+	_ UserHandlers = &userHandlers{}
 )
 
 type UserHandlers interface {
@@ -138,7 +137,7 @@ func (u *userHandlers) GetUserProfile(c *gin.Context) {
 	var claims domains.Claims
 	tokenStr := strings.TrimPrefix(c.GetHeader(authorizationHeader), fmt.Sprintf("%s ", bearerType))
 	_, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
-		return []byte(jwtKey), nil
+		return []byte(configs.Cfg.AuthService.JwtKey), nil
 	})
 	switch err {
 	case nil:
@@ -242,7 +241,7 @@ func (u *userHandlers) GetToken(c *gin.Context) {
 		}
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-		tokenString, err := token.SignedString([]byte(jwtKey))
+		tokenString, err := token.SignedString([]byte(configs.Cfg.AuthService.JwtKey))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError,
 				domains.ErrorResponse{
@@ -283,7 +282,7 @@ func (u *userHandlers) RevokeToken(c *gin.Context) {
 	var claims domains.Claims
 	tokenStr := strings.TrimPrefix(c.GetHeader(authorizationHeader), fmt.Sprintf("%s ", bearerType))
 	_, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (interface{}, error) {
-		return []byte(jwtKey), nil
+		return []byte(configs.Cfg.AuthService.JwtKey), nil
 	})
 	switch err {
 	case nil:
