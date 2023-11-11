@@ -30,6 +30,10 @@ type (
 	}
 )
 
+func NewGroupRepository() GroupRepositoryI {
+	return &GroupRepository{}
+}
+
 func (GroupRepository) Create(ctx context.Context, db *gorm.DB, group *models.Group) error {
 	return db.
 		WithContext(ctx).

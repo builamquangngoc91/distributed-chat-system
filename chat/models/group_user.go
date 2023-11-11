@@ -1,7 +1,6 @@
 package models
 
 import (
-	"chat-service/enums"
 	"time"
 )
 
@@ -10,7 +9,7 @@ type GroupUser struct {
 	UserID      string
 	GroupID     string
 	Name        string
-	Status      enums.GroupUserStatus
+	Status      string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DeletedAt   *time.Time

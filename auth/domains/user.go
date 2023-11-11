@@ -13,11 +13,13 @@ type (
 		Password string `json:"password"`
 	}
 
-	CreateUserResp struct {
+	User struct {
 		UserID   string `json:"user_id,omitempty"`
 		Username string `json:"username,omitempty"`
 		Name     string `json:"name,omitempty"`
 	}
+
+	CreateUserResp User
 
 	GetTokenReq struct {
 		Username string `json:"username"`
@@ -28,6 +30,14 @@ type (
 		Type        string `json:"type"`
 		AccessToken string `json:"access_token"`
 		ExpiresAt   string `json:"expires_at"`
+	}
+
+	ListUsersReq struct {
+		UserIDs []string `json:"user_ids"`
+	}
+
+	ListUsersResp struct {
+		Users []*User `json:"users"`
 	}
 
 	Claims struct {
@@ -56,6 +66,14 @@ func (c *GetTokenReq) Validate() error {
 	}
 	if c.Password == "" {
 		return errors.New("missing password")
+	}
+
+	return nil
+}
+
+func (c *ListUsersReq) Validate() error {
+	if len(c.UserIDs) == 0 {
+		return errors.New("missing user_ids")
 	}
 
 	return nil
