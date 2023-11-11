@@ -12,11 +12,14 @@ import (
 	"chat-service/configs"
 	"chat-service/handlers"
 
+	"github.com/IBM/sarama"
+	_ "github.com/IBM/sarama"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 type (
@@ -66,7 +69,9 @@ func main() {
 		configs.Cfg.Database.Name,
 		configs.Cfg.Database.Port,
 	)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: gormLogger.Default.LogMode(gormLogger.Info),
+	})
 	if err != nil {
 		logger.Sugar().Errorf("connect database error: %s", err.Error())
 		return
@@ -78,7 +83,15 @@ func main() {
 			configs.Cfg.Redis.Port,
 		),
 	})
-	_ = redisClient
+
+	config := sarama.NewConfig()
+	config.Producer.Return.Successes = true
+	config.Producer.Return.Errors = true
+	kafkaProducer, err := sarama.NewSyncProducer(configs.Cfg.Kafka.Brokers, config)
+	if err != nil {
+		logger.Sugar().Errorf("create syncProducer error: %s", err.Error())
+		return
+	}
 
 	// gracefull shutdown
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -88,7 +101,9 @@ func main() {
 
 	// TODO: add ping and health
 	userHandlersDeps := &handlers.ChatHandlersDeps{
-		DB: db,
+		DB:            db,
+		RedisClient:   redisClient,
+		KafkaProducer: kafkaProducer,
 	}
 	chatHandlers := handlers.NewChatHandlers(userHandlersDeps)
 	chatHandlers.RouteGroup(router)

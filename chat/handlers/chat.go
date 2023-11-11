@@ -1,7 +1,11 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
 
 	"chat-service/domains"
@@ -12,28 +16,40 @@ import (
 	"chat-service/repositories"
 	"chat-service/services/authservice"
 
+	"github.com/IBM/sarama"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
-var _ ChatHandlers = &chatHandlers{}
+var (
+	_                  ChatHandlers = &chatHandlers{}
+	userConnectionsMap              = make(map[string][]*websocket.Conn)
+)
 
 type ChatHandlers interface {
 	RouteGroup(r *gin.Engine)
 
-	CreateChatGroup(c *gin.Context)
+	CreateChatGroupHandler(c *gin.Context)
+	WSHandler(c *gin.Context)
 }
 
 type ChatHandlersDeps struct {
-	DB *gorm.DB
+	DB            *gorm.DB
+	RedisClient   *redis.Client
+	KafkaProducer sarama.SyncProducer
 }
 
 type chatHandlers struct {
-	db                  *gorm.DB
-	authService         authservice.AuthService
-	groupRepository     repositories.GroupRepositoryI
-	groupUserRepository repositories.GroupUserRepositoryI
+	db                     *gorm.DB
+	redisClient            *redis.Client
+	authService            authservice.AuthService
+	groupRepository        repositories.GroupRepositoryI
+	groupUserRepository    repositories.GroupUserRepositoryI
+	groupMessageRepository repositories.GroupMessageRepositoryI
+	kafkaProducer          sarama.SyncProducer
 }
 
 func NewChatHandlers(deps *ChatHandlersDeps) ChatHandlers {
@@ -42,18 +58,30 @@ func NewChatHandlers(deps *ChatHandlersDeps) ChatHandlers {
 	}
 
 	return &chatHandlers{
-		db:                  deps.DB,
-		authService:         authservice.NewAuthService(),
-		groupRepository:     repositories.NewGroupRepository(),
-		groupUserRepository: repositories.NewGroupUserRepository(),
+		db:                     deps.DB,
+		redisClient:            deps.RedisClient,
+		authService:            authservice.NewAuthService(),
+		groupRepository:        repositories.NewGroupRepository(),
+		groupUserRepository:    repositories.NewGroupUserRepository(),
+		groupMessageRepository: repositories.NewGroupMessageRepository(),
+		kafkaProducer:          deps.KafkaProducer,
 	}
 }
 
-func (u *chatHandlers) RouteGroup(rg *gin.Engine) {
-	rg.POST("/chats/createChatGroup", middlewares.TokenAuthMiddleware(u.authService), u.CreateChatGroup)
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
-func (u *chatHandlers) CreateChatGroup(c *gin.Context) {
+func (u *chatHandlers) RouteGroup(rg *gin.Engine) {
+	rg.POST("/chats/createChatGroup", middlewares.TokenAuthMiddleware(u.authService), u.CreateChatGroupHandler)
+	rg.GET("/chats/ws", middlewares.TokenAuthMiddleware(u.authService), u.WSHandler)
+}
+
+func (u *chatHandlers) CreateChatGroupHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	userID := contextHelpers.GetUserIDFromCtx(ctx)
 
@@ -132,4 +160,66 @@ func (u *chatHandlers) CreateChatGroup(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{})
+}
+
+func (u *chatHandlers) WSHandler(c *gin.Context) {
+	ctx := c.Request.Context()
+	userID := contextHelpers.GetUserIDFromCtx(ctx)
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, domains.ErrorResp{
+			Message: err.Error(),
+		})
+		return
+	}
+
+	userConnectionsMap[userID] = append(userConnectionsMap[userID], conn)
+	u.listenChatMessages(ctx, conn)
+}
+
+func (u *chatHandlers) listenChatMessages(ctx context.Context, conn *websocket.Conn) {
+	userID := contextHelpers.GetUserIDFromCtx(ctx)
+	for {
+		_, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		var msg domains.Message
+		json.Unmarshal(p, &msg)
+
+		_, err = u.groupUserRepository.GetGroupUser(ctx, u.db, &repositories.GetGroupUserArgs{
+			GroupID: msg.GroupID,
+			UserID:  userID,
+		})
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				fmt.Printf("can find groupUser(groupID: %s, userID: %s)", msg.GroupID, userID)
+				continue
+			}
+			fmt.Printf("getGroupUser(groupID: %s, userID: %s) error: %s", msg.GroupID, userID, err.Error())
+			continue
+		}
+
+		if err := u.groupMessageRepository.Create(ctx, u.db, &models.GroupMessage{
+			MessageID: uuid.NewString(),
+			GroupID:   msg.GroupID,
+			UserID:    userID,
+			Content:   msg.Content,
+		}); err != nil {
+			fmt.Printf("user %s save message content(%s) error : %s", userID, msg.Content, err.Error())
+		}
+
+		_, _, err = u.kafkaProducer.SendMessage(&sarama.ProducerMessage{
+			Topic: "chat-message",
+			Key:   sarama.StringEncoder(msg.GroupID),
+			Value: sarama.StringEncoder(p),
+		})
+		if err != nil {
+			fmt.Printf("kafka error: %s\n", err.Error())
+		}
+
+	}
+
 }
