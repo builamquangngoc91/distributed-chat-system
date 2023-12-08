@@ -10,6 +10,7 @@ import (
 
 	"auth-service/configs"
 	"auth-service/handlers"
+	"auth-service/repositories"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -56,6 +57,7 @@ func main() {
 	userHandlersDeps := &handlers.UserHandlersDeps{
 		DB:          db,
 		RedisClient: redisClient,
+		UserRepo:    repositories.NewUserRepository(),
 	}
 	userHandlers := handlers.NewUserHandlers(userHandlersDeps)
 	userHandlers.RouteGroup(router)

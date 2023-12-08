@@ -23,6 +23,7 @@ const (
 	jwtClaimIDTmpl      = "jwt-claim-id-%s"
 	authorizationHeader = "Authorization"
 	bearerType          = "Bearer"
+	expiration          = 30 * 24 * 60 * 60 * time.Second
 )
 
 var (
@@ -43,11 +44,13 @@ type UserHandlers interface {
 type UserHandlersDeps struct {
 	DB          *gorm.DB
 	RedisClient *redis.Client
+	UserRepo    repositories.UserRepository
 }
 
 type userHandlers struct {
 	db          *gorm.DB
 	redisClient *redis.Client
+	userRepo    repositories.UserRepository
 }
 
 func NewUserHandlers(deps *UserHandlersDeps) UserHandlers {
@@ -58,6 +61,7 @@ func NewUserHandlers(deps *UserHandlersDeps) UserHandlers {
 	return &userHandlers{
 		db:          deps.DB,
 		redisClient: deps.RedisClient,
+		userRepo:    deps.UserRepo,
 	}
 }
 
@@ -88,7 +92,7 @@ func (u *userHandlers) CreateUser(c *gin.Context) {
 		return
 	}
 
-	_, err := repositories.GetUser(ctx, u.db, &repositories.GetUserArgs{
+	_, err := u.userRepo.Get(ctx, u.db, &repositories.GetUserArgs{
 		Username: req.Username,
 	})
 	switch err {
@@ -110,7 +114,7 @@ func (u *userHandlers) CreateUser(c *gin.Context) {
 			return
 		}
 
-		if err := repositories.CreateUser(ctx, u.db, &models.User{
+		if err := u.userRepo.Create(ctx, u.db, &models.User{
 			UserID:       uuid.NewString(),
 			Username:     req.Username,
 			Name:         req.Name,
@@ -176,7 +180,7 @@ func (u *userHandlers) GetUserProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := repositories.GetUser(ctx, u.db, &repositories.GetUserArgs{
+	user, err := u.userRepo.Get(ctx, u.db, &repositories.GetUserArgs{
 		Username: claims.Username,
 	})
 	if err != nil {
@@ -220,7 +224,7 @@ func (u *userHandlers) GetToken(c *gin.Context) {
 		return
 	}
 
-	user, err := repositories.GetUser(ctx, u.db, &repositories.GetUserArgs{
+	user, err := u.userRepo.Get(ctx, u.db, &repositories.GetUserArgs{
 		Username: req.Username,
 	})
 	switch err {
@@ -234,7 +238,6 @@ func (u *userHandlers) GetToken(c *gin.Context) {
 			return
 		}
 
-		expiration := 30 * 24 * 60 * 60 * time.Second
 		expirationTime := time.Now().Add(expiration)
 		claims := &domains.Claims{
 			Username: user.Username,
@@ -336,7 +339,7 @@ func (u *userHandlers) ListUsers(c *gin.Context) {
 		return
 	}
 
-	users, err := repositories.ListUsers(ctx, u.db, &repositories.ListUsersArgs{
+	users, err := u.userRepo.List(ctx, u.db, &repositories.ListUsersArgs{
 		IDs: req.UserIDs,
 	})
 	if err != nil {
