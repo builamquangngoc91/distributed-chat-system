@@ -1,13 +1,30 @@
 package repositories
 
 import (
-	"auth-service/models"
 	"context"
+
+	"auth-service/models"
 
 	"gorm.io/gorm"
 )
 
-func CreateUser(ctx context.Context, db *gorm.DB, user *models.User) error {
+var _ UserRepository = &userRepository{}
+
+//go:generate mockery --name UserRepository
+type UserRepository interface {
+	Create(ctx context.Context, db *gorm.DB, user *models.User) error
+	Get(ctx context.Context, db *gorm.DB, args *GetUserArgs) (*models.User, error)
+	List(ctx context.Context, db *gorm.DB, args *ListUsersArgs) (users []*models.User, _ error)
+}
+
+type userRepository struct {
+}
+
+func NewUserRepository() UserRepository {
+	return &userRepository{}
+}
+
+func (u *userRepository) Create(ctx context.Context, db *gorm.DB, user *models.User) error {
 	return db.WithContext(ctx).Table("users").Create(user).Error
 }
 
@@ -15,7 +32,7 @@ type GetUserArgs struct {
 	Username string
 }
 
-func GetUser(ctx context.Context, db *gorm.DB, args *GetUserArgs) (*models.User, error) {
+func (u *userRepository) Get(ctx context.Context, db *gorm.DB, args *GetUserArgs) (*models.User, error) {
 	query := db.WithContext(ctx).Table("users")
 	if args.Username != "" {
 		query.Where("username = ?", args.Username)
@@ -31,7 +48,7 @@ type ListUsersArgs struct {
 	IDs []string
 }
 
-func ListUsers(ctx context.Context, db *gorm.DB, args *ListUsersArgs) (users []*models.User, _ error) {
+func (u *userRepository) List(ctx context.Context, db *gorm.DB, args *ListUsersArgs) (users []*models.User, _ error) {
 	query := db.WithContext(ctx).Table("users")
 	if len(args.IDs) != 0 {
 		query.Where("user_id IN ?", args.IDs)

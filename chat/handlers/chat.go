@@ -98,7 +98,6 @@ func (u *chatHandlers) CreateChatGroup(c *gin.Context) {
 	}
 
 	// TODO: check user_ids and users
-
 	err = u.db.Transaction(func(tx *gorm.DB) error {
 		group := &models.Group{
 			GroupID: uuid.NewString(),
