@@ -15,6 +15,8 @@ type (
 	CreateChatGroupResp struct {
 		Success bool `json:"success"`
 	}
+
+	
 )
 
 func (c *CreateChatGroupReq) Validate() error {

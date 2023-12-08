@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -20,6 +21,7 @@ func TokenAuthMiddleware(authService authservice.AuthService) gin.HandlerFunc {
 			Token: token,
 		})
 		if err != nil {
+			fmt.Printf("error %s", err.Error())
 			c.AbortWithStatusJSON(http.StatusInternalServerError, &domains.ErrorResp{
 				Message: err.Error(),
 			})

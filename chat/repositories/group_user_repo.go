@@ -14,6 +14,12 @@ type (
 
 	GroupUserRepositoryI interface {
 		Create(context.Context, *gorm.DB, *models.GroupUser) error
+		GetGroupUser(ctx context.Context, db *gorm.DB, args *GetGroupUserArgs) (group *models.GroupUser, err error)
+	}
+
+	GetGroupUserArgs struct {
+		GroupID string
+		UserID  string
 	}
 )
 
@@ -26,4 +32,23 @@ func (GroupUserRepository) Create(ctx context.Context, db *gorm.DB, group *model
 		WithContext(ctx).
 		Create(group).
 		Error
+}
+
+func (GroupUserRepository) GetGroupUser(ctx context.Context, db *gorm.DB, args *GetGroupUserArgs) (*models.GroupUser, error) {
+	db = db.
+		WithContext(ctx)
+
+	if args.GroupID != "" {
+		db = db.Where("group_id = ?", args.GroupID)
+	}
+	if args.UserID != "" {
+		db = db.Where("user_id = ?", args.UserID)
+	}
+
+	var groupUser models.GroupUser
+	if err := db.First(&groupUser).Error; err != nil {
+		return nil, err
+	}
+
+	return &groupUser, nil
 }

@@ -67,12 +67,17 @@ func (s *authService) GetUserProfile(ctx context.Context, args *GetUserProfileRe
 	}
 	defer res.Body.Close()
 
-	var userPofile GetUserProfileResp
-	if err := json.NewDecoder(res.Body).Decode(&userPofile); err != nil {
-		return nil, err
+	// TODO: add commons parse Error
+	if res.StatusCode == http.StatusOK {
+		var userPofile GetUserProfileResp
+		if err := json.NewDecoder(res.Body).Decode(&userPofile); err != nil {
+			return nil, err
+		}
+
+		return &userPofile, err
 	}
 
-	return &userPofile, err
+	return nil, fmt.Errorf("status %s", res.Status)
 }
 
 func (s *authService) ListUsers(ctx context.Context, args *ListUsersReq) (*ListUsersResp, error) {

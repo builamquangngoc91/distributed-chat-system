@@ -10,6 +10,10 @@ type Database struct {
 	Port     string
 }
 
+type Kafka struct {
+	Brokers []string
+}
+
 type Redis struct {
 	Host string
 	Port string
@@ -28,6 +32,7 @@ type Config struct {
 	Redis       Redis
 	AuthService AuthService
 	ChatService ChatService
+	Kafka       Kafka
 }
 
 var Cfg Config
@@ -50,6 +55,9 @@ func LoadConfig() {
 		},
 		ChatService: ChatService{
 			Port: os.Getenv("SN_CHAT_SERVICE_PORT"),
+		},
+		Kafka: Kafka{
+			Brokers: []string{"localhost:9092"},
 		},
 	}
 }
