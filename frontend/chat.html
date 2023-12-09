@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <!-- Include Bootstrap CSS for styling -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        .chat-container {
+            max-width: 600px;
+            margin: 50px auto;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+        }
+
+        #messageInput {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container chat-container">
+    <div id="chatMessages"></div>
+    <div class="form-group">
+        <input type="text" class="form-control" id="groupIDInput" placeholder="Type groupID ...">
+    </div>
+    <div class="form-group">
+        <input type="text" class="form-control" id="messageInput" placeholder="Type your message...">
+    </div>
+    <button class="btn btn-primary" onclick="sendMessage()">Send</button>
+</div>
+
+<!-- Include Bootstrap JS and Popper.js (optional) -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.0.8/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+<script>
+    const socket = new WebSocket("ws://localhost:8081/chats/ws?Authorization=" + localStorage['access_token']); // Replace with your WebSocket server URL
+
+    // Display incoming messages in the chat
+    socket.addEventListener('message', function (event) {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message');
+        messageDiv.textContent = JSON.parse(event.data).content;
+        chatMessages.appendChild(messageDiv);
+    });
+
+    // Function to send a message
+    function sendMessage() {
+        const messageInput = document.getElementById('messageInput');
+        const groupIDInput = document.getElementById('groupIDInput');
+        const message = messageInput.value;
+        let data = {
+            "group_id": groupIDInput.value,
+            "content": message,
+        }
+
+        if (message.trim() !== '') {
+            // Send the message to the WebSocket server
+            socket.send(JSON.stringify(data));
+            console.log("--------");
+
+            // Display the sent message in the chat
+            // const chatMessages = document.getElementById('chatMessages');
+            // const messageDiv = document.createElement('div');
+            // messageDiv.classList.add('message');
+            // messageDiv.classList.add('sender');
+            // messageDiv.textContent = message;
+            // chatMessages.appendChild(messageDiv);
+
+            // Clear the message input
+            messageInput.value = '';
+        }
+    }
+</script>
+
+</body>
+</html>

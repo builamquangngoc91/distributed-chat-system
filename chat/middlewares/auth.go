@@ -16,6 +16,9 @@ import (
 func TokenAuthMiddleware(authService authservice.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authorizationValue := c.Request.Header.Get("Authorization")
+		if authorizationValue == "" {
+			authorizationValue = c.Request.URL.Query().Get("Authorization")
+		}
 		token := strings.TrimPrefix(authorizationValue, "Bearer ")
 		userProfile, err := authService.GetUserProfile(c.Request.Context(), &authservice.GetUserProfileReq{
 			Token: token,
