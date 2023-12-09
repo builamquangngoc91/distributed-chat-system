@@ -107,6 +107,7 @@ func main() {
 	}
 	chatHandlers := handlers.NewChatHandlers(userHandlersDeps)
 	chatHandlers.RouteGroup(router)
+	chatHandlers.StartChatListeners()
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", configs.Cfg.ChatService.Port),

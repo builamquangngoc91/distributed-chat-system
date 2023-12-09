@@ -18,3 +18,15 @@ type GroupUser struct {
 func (GroupUser) TableName() string {
 	return "groups_users"
 }
+
+type GroupUsers []*GroupUser
+
+func (groupUsers *GroupUsers) UserIDs() []string {
+	var userIDs []string
+
+	for _, groupUser := range *groupUsers {
+		userIDs = append(userIDs, groupUser.UserID)
+	}
+
+	return userIDs
+}
